@@ -4,8 +4,12 @@ import javafx.application.Application;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -18,14 +22,25 @@ import java.io.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.lang.Double.NEGATIVE_INFINITY;
+import static java.lang.Double.NaN;
+import static java.lang.Double.POSITIVE_INFINITY;
+
 public class Main extends Application {
 
     public double values[][];
+    public double permeability[];
     public double cValue = 6;
     
     int noOfParameter;
-    public double noOfData=0.0;
-    
+    public int noOfData=0;
+    String depthUnit = "";
+    double startDepth;
+    double endDepth;
+    double minPer;
+    double maxPer;
+    double nullValue;
+
     public int bfvIndex;
     public int cmffIndex;
     public int cmrpIndex;
@@ -100,7 +115,64 @@ public class Main extends Application {
     }
 
     public void updateGraph(){
+        layout.setCenter(null);
+        minPer = POSITIVE_INFINITY;
+        maxPer = NEGATIVE_INFINITY;
 
+        for (int i=0;i<noOfData;++i){
+            if(values[i][1]==nullValue || values[i][2]==nullValue || values[i][3]==nullValue)
+                permeability[i] = NEGATIVE_INFINITY;
+            else
+                permeability[i] = (values[i][3]*values[i][3]*values[i][2])/(cValue*cValue*values[i][1]);
+
+            if(Double.isNaN(permeability[i]) || permeability[i] == POSITIVE_INFINITY || permeability[i] == NEGATIVE_INFINITY ){
+//                System.out.println("NaN case");
+            }
+            else{
+                if(minPer > permeability[i]){
+                    System.out.println("min updates: "+minPer+" to "+permeability[i]);
+                    minPer = permeability[i];
+                }
+                if(maxPer < permeability[i]) {
+                    System.out.println("max updates: " + maxPer + " to " + permeability[i]);
+                    maxPer = permeability[i];
+                }
+            }
+        }
+
+        NumberAxis xAxis = new NumberAxis(minPer,maxPer,(maxPer-minPer)/5);
+        xAxis.setLabel("Permeability of Coates");
+        xAxis.setAutoRanging(false);
+
+        //Defining the y axis
+        NumberAxis yAxis = new NumberAxis(endDepth,startDepth,-100);
+        yAxis.setAutoRanging(false);
+        yAxis.setLabel("Depth in "+depthUnit);
+
+        //Creating the line chart
+        LineChart linechart = new LineChart(xAxis, yAxis);
+
+        linechart.setAnimated(false);
+        linechart.setCreateSymbols(false);
+
+        //Prepare XYChart.Series objects by setting data
+        XYChart.Series series = new XYChart.Series();
+        series.setName("Free Fluid (Timur Coater Model)");
+
+        for (int j=0;j<=noOfData;++j){
+            if(!Double.isNaN(permeability[j]) && permeability[j] != NEGATIVE_INFINITY && permeability[j] != POSITIVE_INFINITY  )
+                series.getData().add(new XYChart.Data(permeability[j],values[j][0]));
+        }
+        linechart.setAxisSortingPolicy(LineChart.SortingPolicy.NONE);
+
+        linechart.getData().add(series);
+        series.getNode().setStyle("-fx-stroke-width: 2;-fx-stroke: blue; ");
+
+        layout.setCenter(new ScrollPane(linechart));
+        System.out.println("Start  Depth "+startDepth);
+        System.out.println("END  Depth "+endDepth);
+        System.out.println("min  per"+minPer);
+        System.out.println("maxPer "+maxPer);
     }
 
     public boolean loadlas(File selectedlas)throws IOException{
@@ -109,7 +181,7 @@ public class Main extends Application {
             bufferedReader = new BufferedReader(new FileReader(selectedlas));
 
             String text;
-            Pattern regex = Pattern.compile("(\\d+(?:\\.\\d+)?)"); //regex used as delimiter
+            Pattern regex = Pattern.compile("(-?\\d+(?:\\.\\d+)?)"); //regex used as delimiter
             boolean Isdata = false, Isparameter = false;
             int index = 0;
             double increment;
@@ -145,22 +217,31 @@ public class Main extends Application {
                 } else if (text.length() > 4 && (text.substring(0, 4).equalsIgnoreCase("STRT"))) {
                     Matcher matcher = regex.matcher(text);
                     while (matcher.find()) {
-                        noOfData -= Double.parseDouble(matcher.group(1));
+                        startDepth = Double.parseDouble(matcher.group(1));
+                        noOfData -= startDepth;
                     }
                 } else if (text.length() > 4 && (text.substring(0, 4).equalsIgnoreCase("STOP"))) {
                     Matcher matcher = regex.matcher(text);
                     while (matcher.find()) {
-                        noOfData += Double.parseDouble(matcher.group(1));
+                        endDepth = Double.parseDouble(matcher.group(1));
+                        noOfData += endDepth;
                     }
                 } else if (text.length() > 4 && (text.substring(0, 4).equalsIgnoreCase("STEP"))) {
                     Matcher matcher = regex.matcher(text);
                     while (matcher.find()) {
                         increment = Double.parseDouble(matcher.group(1));
-                        noOfData /= increment;
+                        noOfData = (int)Math.ceil(noOfData/increment);
+                    }
+                }else if (text.length() > 4 && (text.substring(0, 4).equalsIgnoreCase("NULL"))) {
+                    Matcher matcher = regex.matcher(text);
+                    while (matcher.find()) {
+                        nullValue = Double.parseDouble(matcher.group(1));
                     }
                 } else if (text.length() > 5 && (text.replaceAll("\\s", "").substring(0, 5).equalsIgnoreCase("depth"))) {
                     Isparameter = true;
                     noOfParameter = 1;
+                    text = text.replaceAll("\\s", "");
+//                    depthUnit = text.substring(text.indexOf(".")+1,text.indexOf(" ", text.indexOf(".")+1));
                 } else if (Isparameter && !(text.replaceAll("\\s", "").substring(0, 1).equalsIgnoreCase("~"))) {
                     ++noOfParameter;
                     String parameter = text.substring(0, text.replaceAll("\\s", "").indexOf("."));
@@ -191,7 +272,8 @@ public class Main extends Application {
                         return false;
                     }
                     Isdata = true;
-                    values = new double[(int)Math.ceil(noOfData) + 1][4];
+                    values = new double[noOfData + 1][4];
+                    permeability = new double[noOfData + 1];
                 }else{
                     Isparameter = false;
                 }
