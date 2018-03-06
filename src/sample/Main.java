@@ -44,33 +44,48 @@ public class Main extends Application {
             if(selectedlas != null){
                 try {
                     loadlas(selectedlas);
+                    if(false)
+                        handleError("file", "file does not have some parameter required");
+                    else
+                        updateGraph();
                 }
                 catch (IOException el){
                     el.printStackTrace();
                 }
             }
-            else
+            else {
                 handleError("file", "file not laoded/ cancelled");
+            }
         });
         fileError = new Label("");
         fileError.setFont(new Font("Arial", 11));
         fileError.setStyle("-fx-text-fill: red;");
         VBox fileHB = new VBox(20, loadLas, fileError);
 
-        TextField cValue = new TextField("6");
-        cValue.setPromptText("enter c value in range 5-7");
-        Button updateCValue = new Button("update 'c' value");
-        updateCValue.setOnAction(e->{
-            
+        Label cValueLabel = new Label("'C' value");
+        TextField cValueText = new TextField("6");
+        cValueText.textProperty().addListener((observable, oldValue, newValue) -> {
+            try{
+                double newC = Double.parseDouble(newValue);
+                cValue = newC;
+                if(newC<5 || newC>7)
+                    handleError("c error", "c value should be in range [5,7]");
+                else
+                    updateGraph();
+            }
+            catch (Exception e){
+                handleError("c error", "found internal error - "+e.getMessage().substring(0,50)+"  ......");
+            }
         });
+        cValueText.setPromptText("enter c value in range 5-7");
         cValueError = new Label("");
         cValueError.setFont(new Font("Arial", 11));
         cValueError.setStyle("-fx-text-fill: red;");
-        VBox cValueHB = new VBox(20, new HBox(25,cValue, updateCValue), cValueError);
+        VBox cValueHB = new VBox(20, new HBox(10,cValueLabel, cValueText), cValueError);
 
         layout = new BorderPane();
         layout.setPadding(new Insets(20));
-        layout.setTop(new HBox(50,loadLas, ));
+        layout.setTop(new HBox(50,fileHB, cValueHB));
 
         primaryStage.setTitle("Permeability estimation using NMR log - Siddharth's Dissertation");
         primaryStage.setScene(new Scene(layout, 600, 400));
@@ -80,6 +95,10 @@ public class Main extends Application {
 
     public static void main(String[] args) {
         launch(args);
+    }
+
+    public void updateGraph(){
+
     }
 
     public void loadlas(File selectedlas)throws IOException{
