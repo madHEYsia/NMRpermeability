@@ -23,7 +23,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.lang.Double.NEGATIVE_INFINITY;
-import static java.lang.Double.NaN;
 import static java.lang.Double.POSITIVE_INFINITY;
 
 public class Main extends Application {
@@ -84,14 +83,15 @@ public class Main extends Application {
         cValueText.textProperty().addListener((observable, oldValue, newValue) -> {
             try{
                 double newC = Double.parseDouble(newValue);
-                cValue = newC;
                 if(newC<5 || newC>7)
                     handleError("c error", "c value should be in range [5,7]");
-                else
+                else {
+                    cValue = newC;
                     updateGraph();
+                }
             }
             catch (Exception e){
-                handleError("c error", "found internal error - "+e.getMessage().substring(0,50)+"  ......");
+                handleError("c error", "Invalid entry");
             }
         });
         cValueText.setPromptText("enter c value in range 5-7");
@@ -126,17 +126,12 @@ public class Main extends Application {
                 permeability[i] = (values[i][3]*values[i][3]*values[i][2])/(cValue*cValue*values[i][1]);
 
             if(Double.isNaN(permeability[i]) || permeability[i] == POSITIVE_INFINITY || permeability[i] == NEGATIVE_INFINITY ){
-//                System.out.println("NaN case");
             }
             else{
-                if(minPer > permeability[i]){
-                    System.out.println("min updates: "+minPer+" to "+permeability[i]);
+                if(minPer > permeability[i])
                     minPer = permeability[i];
-                }
-                if(maxPer < permeability[i]) {
-                    System.out.println("max updates: " + maxPer + " to " + permeability[i]);
+                if(maxPer < permeability[i])
                     maxPer = permeability[i];
-                }
             }
         }
 
@@ -166,13 +161,15 @@ public class Main extends Application {
         linechart.setAxisSortingPolicy(LineChart.SortingPolicy.NONE);
 
         linechart.getData().add(series);
-        series.getNode().setStyle("-fx-stroke-width: 2;-fx-stroke: blue; ");
+        series.getNode().setStyle("-fx-stroke-width: 1;-fx-stroke: blue; ");
 
-        layout.setCenter(new ScrollPane(linechart));
-        System.out.println("Start  Depth "+startDepth);
-        System.out.println("END  Depth "+endDepth);
-        System.out.println("min  per"+minPer);
-        System.out.println("maxPer "+maxPer);
+        ScrollPane chart = new ScrollPane(linechart);
+        linechart.setPrefHeight(layout.getHeight()-70);
+        linechart.setPrefWidth(layout.getWidth()-50);
+        layout.heightProperty().addListener(e-> linechart.setPrefHeight(layout.getHeight()-70) );
+        layout.widthProperty().addListener(e-> linechart.setPrefWidth(layout.getWidth()-50) );
+
+        layout.setCenter(chart);
     }
 
     public boolean loadlas(File selectedlas)throws IOException{
@@ -189,7 +186,7 @@ public class Main extends Application {
             boolean bfv= false, cmff= false, cmrp = false;
 
             int textInd = 0;
-            while ((text = bufferedReader.readLine()) != null && text.length() > 0) {
+           while ((text = bufferedReader.readLine()) != null && text.length() > 0) {
                 if (Isdata) {
                     if(textInd==noOfParameter){
                         ++index;
@@ -203,6 +200,7 @@ public class Main extends Application {
                     //finding indexOF of spaces which gives me parameter value just before that
                     while (text.indexOf(" ", textindex) > 0) {
                         int indexOf = text.indexOf(" ", textindex);
+//                        System.out.println(textInd+" "+Double.parseDouble(text.substring(textindex, indexOf)));
                         if(textInd==0)
                             values[index][0] = Double.parseDouble(text.substring(textindex, indexOf));
                         else if(textInd==bfvIndex)
@@ -272,8 +270,9 @@ public class Main extends Application {
                         return false;
                     }
                     Isdata = true;
-                    values = new double[noOfData + 1][4];
-                    permeability = new double[noOfData + 1];
+                    values = new double[noOfData + 10][4];
+                    permeability = new double[noOfData + 10];
+                    System.out.println("noOfParameter: "+noOfParameter);
                 }else{
                     Isparameter = false;
                 }
