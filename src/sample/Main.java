@@ -21,11 +21,14 @@ import java.util.regex.Pattern;
 public class Main extends Application {
 
     public double values[][];
-    public double datas=0.0,increment=0.0;
-    public String parameter[]=new String[30];
-    public int noOfParameter=-1;
-    public double range[][];
     public double cValue = 6;
+    
+    int noOfParameter;
+    public double noOfData=0.0;
+    
+    public int bfvIndex;
+    public int cmffIndex;
+    public int cmrpIndex;
 
     public Label fileError;
     public Label cValueError;
@@ -43,10 +46,8 @@ public class Main extends Application {
             File selectedlas =  loadlasdirrctory.showOpenDialog(primaryStage);
             if(selectedlas != null){
                 try {
-                    loadlas(selectedlas);
-                    if(false)
-                        handleError("file", "file does not have some parameter required");
-                    else
+                    boolean fileLoaded = loadlas(selectedlas);
+                    if(fileLoaded)
                         updateGraph();
                 }
                 catch (IOException el){
@@ -60,10 +61,11 @@ public class Main extends Application {
         fileError = new Label("");
         fileError.setFont(new Font("Arial", 11));
         fileError.setStyle("-fx-text-fill: red;");
-        VBox fileHB = new VBox(20, loadLas, fileError);
+        VBox fileHB = new VBox(5, loadLas, fileError);
 
         Label cValueLabel = new Label("'C' value");
         TextField cValueText = new TextField("6");
+        cValueText.setPrefWidth(50);
         cValueText.textProperty().addListener((observable, oldValue, newValue) -> {
             try{
                 double newC = Double.parseDouble(newValue);
@@ -81,10 +83,10 @@ public class Main extends Application {
         cValueError = new Label("");
         cValueError.setFont(new Font("Arial", 11));
         cValueError.setStyle("-fx-text-fill: red;");
-        VBox cValueHB = new VBox(20, new HBox(10,cValueLabel, cValueText), cValueError);
+        VBox cValueHB = new VBox(5, new HBox(10,cValueLabel, cValueText), cValueError);
 
         layout = new BorderPane();
-        layout.setPadding(new Insets(20));
+        layout.setPadding(new Insets(10));
         layout.setTop(new HBox(50,fileHB, cValueHB));
 
         primaryStage.setTitle("Permeability estimation using NMR log - Siddharth's Dissertation");
@@ -101,100 +103,105 @@ public class Main extends Application {
 
     }
 
-    public void loadlas(File selectedlas)throws IOException{
+    public boolean loadlas(File selectedlas)throws IOException{
         BufferedReader bufferedReader;
         try {
-            //BufferedReader fot LAS/ ASCII file input
             bufferedReader = new BufferedReader(new FileReader(selectedlas));
 
             String text;
             Pattern regex = Pattern.compile("(\\d+(?:\\.\\d+)?)"); //regex used as delimiter
             boolean Isdata = false, Isparameter = false;
-            int index = 0, parameterindex = -1;
+            int index = 0;
+            double increment;
 
-            //Reading each line and storing each parameter value to temporary matrix
+            boolean bfv= false, cmff= false, cmrp = false;
+
+            int textInd = 0;
             while ((text = bufferedReader.readLine()) != null && text.length() > 0) {
-
-                //Checking for empty lines
                 if (Isdata) {
-
+                    if(textInd==noOfParameter){
+                        ++index;
+                        textInd = 0;
+                    }
                     //Replacing multiple line spaces to single space
-                    text = (text.replaceAll("[ ]+", " ")).substring(1);
                     text += " ";
+                    text = (text.replaceAll("[ ]+", " ")).substring(1);
                     int textindex = 0;
 
                     //finding indexOF of spaces which gives me parameter value just before that
                     while (text.indexOf(" ", textindex) > 0) {
-                        if (++parameterindex == 0)
-                            values[index][parameterindex] = 0.3048 * Double.parseDouble(text.substring(textindex, text.indexOf(" ", textindex)));
-                            //0.3048 factor to convert meter to feet
-                        else{
-                            values[index][parameterindex] = Double.parseDouble(text.substring(textindex, text.indexOf(" ", textindex)));
-                            if(index==0){
-
-                                //Storing minimum at index 1 and maximum at index 2.
-                                range[0][parameterindex]=values[index][parameterindex];
-                                range[1][parameterindex]=values[index][parameterindex];
-                            }
-                            else {
-                                if(range[0][parameterindex]>values[index][parameterindex])
-                                    range[0][parameterindex]=values[index][parameterindex];
-                                if(range[1][parameterindex]<values[index][parameterindex])
-                                    range[1][parameterindex]=values[index][parameterindex];
-                            }
-                        }
-                        textindex = text.indexOf(" ", textindex) + 1;
+                        int indexOf = text.indexOf(" ", textindex);
+                        if(textInd==0)
+                            values[index][0] = Double.parseDouble(text.substring(textindex, indexOf));
+                        else if(textInd==bfvIndex)
+                            values[index][1] = Double.parseDouble(text.substring(textindex, indexOf));
+                        else if(textInd==cmffIndex)
+                            values[index][2] = Double.parseDouble(text.substring(textindex, indexOf));
+                        else if(textInd==cmrpIndex)
+                            values[index][3] = Double.parseDouble(text.substring(textindex, indexOf));
+                        textindex = indexOf + 1;
+                        ++textInd;
                     }
-                    ++index;
-                    parameterindex = -1;
-
-                    //Reinitializing parameterindexIndex = -1 to start for new line
                 } else if (text.length() > 4 && (text.substring(0, 4).equalsIgnoreCase("STRT"))) {
-
-                    //Checking for Start Depth Data and working accordingly
                     Matcher matcher = regex.matcher(text);
                     while (matcher.find()) {
-                        datas -= Double.parseDouble(matcher.group(1));
+                        noOfData -= Double.parseDouble(matcher.group(1));
                     }
                 } else if (text.length() > 4 && (text.substring(0, 4).equalsIgnoreCase("STOP"))) {
-
-                    //Checking for End Depth Data and working accordingly
                     Matcher matcher = regex.matcher(text);
                     while (matcher.find()) {
-                        datas += Double.parseDouble(matcher.group(1));
+                        noOfData += Double.parseDouble(matcher.group(1));
                     }
                 } else if (text.length() > 4 && (text.substring(0, 4).equalsIgnoreCase("STEP"))) {
-
-                    //Checking for Step Increment Data and working accordingly
                     Matcher matcher = regex.matcher(text);
                     while (matcher.find()) {
                         increment = Double.parseDouble(matcher.group(1));
-                        datas /= increment;
+                        noOfData /= increment;
                     }
-                } else if (text.length() > 5 && (text.substring(1, 6).equalsIgnoreCase("depth"))) {
-
-                    //Checking for Start Depth Data and working accordingly
+                } else if (text.length() > 5 && (text.replaceAll("\\s", "").substring(0, 5).equalsIgnoreCase("depth"))) {
                     Isparameter = true;
-                    parameter[++noOfParameter] = "Depth in meter";
-                } else if (Isparameter && !(text.substring(0, 4).equalsIgnoreCase("~Asc"))) {
-
-                    //"~Asc" Statement confirms start of Data
-                    parameter[++noOfParameter] = text.substring(1, text.indexOf(" ", 1));
-                } else if (text.length() > 4 && (text.substring(0, 4).equalsIgnoreCase("~Asc"))) {
-
-                    //Once Data is confirmed initialize values matrix for reading las/ASCII file values
+                    noOfParameter = 1;
+                } else if (Isparameter && !(text.replaceAll("\\s", "").substring(0, 1).equalsIgnoreCase("~"))) {
+                    ++noOfParameter;
+                    String parameter = text.substring(0, text.replaceAll("\\s", "").indexOf("."));
+                    if(!bfv && parameter.equals("BFV")){
+                        bfv = true;
+                        bfvIndex = noOfParameter-1;
+                    }
+                    else if(!cmff && parameter.equals("CMFF")){
+                        cmff = true;
+                        cmffIndex = noOfParameter-1;
+                    }
+                    else if(!cmrp && parameter.equals("CMRP_3MS")){
+                        cmrp = true;
+                        cmrpIndex = noOfParameter-1;
+                    }
+                }
+                else if (text.length() > 4 && (text.replaceAll("\\s", "").substring(0, 2).equalsIgnoreCase("~A"))) {
+                    if (!bfv){
+                        handleError("file", "BFV data not found");
+                        return false;
+                    }
+                    else if (!cmff){
+                        handleError("file", "CMFF data not found");
+                        return false;
+                    }
+                    else if (!cmrp){
+                        handleError("file", "CMRP data not found");
+                        return false;
+                    }
                     Isdata = true;
-                    values = new double[(int) datas + 1][noOfParameter + 1];
-                    range= new double[2][noOfParameter + 1];
+                    values = new double[(int)Math.ceil(noOfData) + 1][4];
+                }else{
+                    Isparameter = false;
                 }
             }
-            range[0][0] = values[0][0];
-            range[1][0] = values[(int) datas][0];
-
         }
-        catch (FileNotFoundException ex) {}
-        catch (IOException ex) {}
-        finally {}
+        catch (Exception ex) {
+            ex.printStackTrace();
+            return false;
+        }
+        return true;
     }
 
     public void handleError(String errorLabel, String error){
