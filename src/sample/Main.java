@@ -52,6 +52,8 @@ public class Main extends Application {
     @Override
     public void start(Stage primaryStage) throws Exception{
 
+        primaryStage.setTitle("Permeability estimation using NMR log - Siddharth's Dissertation");
+
         Button loadLas = new Button("Load file");
         loadLas.setOnAction(e->{
             FileChooser loadlasdirrctory = new FileChooser();
@@ -61,8 +63,10 @@ public class Main extends Application {
             if(selectedlas != null){
                 try {
                     boolean fileLoaded = loadlas(selectedlas);
-                    if(fileLoaded)
+                    if(fileLoaded) {
                         updateGraph();
+                        primaryStage.setTitle("Permeability estimation of "+selectedlas.getName());
+                    }
                 }
                 catch (IOException el){
                     el.printStackTrace();
@@ -104,7 +108,6 @@ public class Main extends Application {
         layout.setPadding(new Insets(10));
         layout.setTop(new HBox(50,fileHB, cValueHB));
 
-        primaryStage.setTitle("Permeability estimation using NMR log - Siddharth's Dissertation");
         primaryStage.setScene(new Scene(layout, 600, 400));
         primaryStage.show();
     }
@@ -122,21 +125,25 @@ public class Main extends Application {
         for (int i=0;i<noOfData;++i){
             if(values[i][1]==nullValue || values[i][2]==nullValue || values[i][3]==nullValue)
                 permeability[i] = NEGATIVE_INFINITY;
-            else
+            else{
                 permeability[i] = (values[i][3]*values[i][3]*values[i][2])/(cValue*cValue*values[i][1]);
+                permeability[i] = permeability[i]*permeability[i]*1000;
+            }
 
             if(Double.isNaN(permeability[i]) || permeability[i] == POSITIVE_INFINITY || permeability[i] == NEGATIVE_INFINITY ){
             }
             else{
-                if(minPer > permeability[i])
-                    minPer = permeability[i];
                 if(maxPer < permeability[i])
                     maxPer = permeability[i];
+                if(minPer > permeability[i])
+                    minPer = permeability[i];
             }
         }
+        maxPer *=1.2;
+        minPer *=0.8;
 
         NumberAxis xAxis = new NumberAxis(minPer,maxPer,(maxPer-minPer)/5);
-        xAxis.setLabel("Permeability of Coates");
+        xAxis.setLabel("Permeability of Coates in MD");
         xAxis.setAutoRanging(false);
 
         //Defining the y axis
@@ -155,18 +162,18 @@ public class Main extends Application {
         series.setName("Free Fluid (Timur Coater Model)");
 
         for (int j=0;j<=noOfData;++j){
-            if(!Double.isNaN(permeability[j]) && permeability[j] != NEGATIVE_INFINITY && permeability[j] != POSITIVE_INFINITY  )
+            if(!Double.isNaN(permeability[j]) && permeability[j] != NEGATIVE_INFINITY && permeability[j] != POSITIVE_INFINITY)
                 series.getData().add(new XYChart.Data(permeability[j],values[j][0]));
         }
         linechart.setAxisSortingPolicy(LineChart.SortingPolicy.NONE);
 
         linechart.getData().add(series);
-        series.getNode().setStyle("-fx-stroke-width: 1;-fx-stroke: blue; ");
+        series.getNode().setStyle("-fx-stroke-width: 2;-fx-stroke: blue; ");
 
         ScrollPane chart = new ScrollPane(linechart);
-        linechart.setPrefHeight(layout.getHeight()-70);
-        linechart.setPrefWidth(layout.getWidth()-50);
-        layout.heightProperty().addListener(e-> linechart.setPrefHeight(layout.getHeight()-70) );
+        linechart.setPrefHeight(layout.getHeight()*50-70);
+        linechart.setPrefWidth(layout.getWidth()*-50);
+        layout.heightProperty().addListener(e-> linechart.setPrefHeight(layout.getHeight()*50-70) );
         layout.widthProperty().addListener(e-> linechart.setPrefWidth(layout.getWidth()-50) );
 
         layout.setCenter(chart);
